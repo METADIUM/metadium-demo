@@ -95,6 +95,7 @@ function start_leader ()
     if [ ! -d $NODE_DIR/.ethash ]; then
         mkdir -p $NODE_DIR/.ethash
         ${GMET} makedag 0 $NODE_DIR/.ethash
+        ${GMET} makedag 30000 $NODE_DIR/.ethash
         for i in $NODES; do
             [ $i = $NODE ] && continue
             mkdir -p $DIR/$i/.ethash
