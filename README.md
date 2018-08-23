@@ -6,7 +6,8 @@ Demo for go-metadium, including docker containers and a simple hash table smart 
 
 Docker and docker-compose are required to be installed. With that, the following command sets up a metadium network with three nodes: meta1, meta2 and meta3.
 
-    cd containers/docker
+    git clone https://github.com/metadium/metadium-demo
+    cd metadium-demo/containers/docker
     docker-compose up
 
 ### Tearing Down
