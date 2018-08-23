@@ -16,7 +16,7 @@ Docker and docker-compose are required to be installed. With that, the following
 
 ### Ports
 
-Ports are mapped as follows.
+Ports 10009 &amp; 10010 are mapped as follows.
 
     meta1: 30109 & 30110
     meta2: 30209 & 30210
