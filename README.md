@@ -37,7 +37,7 @@ e.g.
 Now one needs to use internal ports, i.e. 10010, not redirected ports.
 
     // Request
-    curl -H "Content-Type: application/json" -X POST --data '{"jsonrpc":"2.0","method":"eth_accounts","params":[],"id":1}' http://localhost:10110
+    curl -H "Content-Type: application/json" -X POST --data '{"jsonrpc":"2.0","method":"eth_accounts","params":[],"id":1}' http://localhost:10010
 
     // Result
     {"jsonrpc":"2.0","id":1,"result":["0x4ce5c113c994e4f87f0729baec89e59813faaf53","0x044a6249451cfab7adf0e486ee0b6235aadf44ef","0x9a4073a0121c0967c5325f5a789c73b1a0caaf0b","0x1b7398d5f3754ee2ec1f1ecb1f60c4fb6c3d4e0a"]}
