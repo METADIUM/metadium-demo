@@ -1,0 +1,3 @@
+[submodule "vendor/github.com/metadium/go-metadium"]
+	path = vendor/github.com/metadium/go-metadium
+	url = https://github.com/metadium/go-metadium

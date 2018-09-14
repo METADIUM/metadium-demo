@@ -29,6 +29,8 @@ function do_admin ()
 
     [ "$TOADDR" = \"0x0000000000000000000000000000000000000000\" ] || return 0
 
+    #$GMET metadium deploy-contract --password demo --gas 10000000 -gasprice 1 --url http://localhost:10010 $NODE_DIR/keystore/account-1 Admin $NODE_DIR/MetadiumAdmin.js
+
     echo 'personal.unlockAccount(eth.accounts[0], "demo", 3600);
 loadScript("MetadiumAdmin.js");
 Admin_new();' | $GMET attach ipc:$NODE_DIR/geth.ipc > /dev/null 2>&1
