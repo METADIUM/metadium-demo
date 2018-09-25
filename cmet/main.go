@@ -68,7 +68,7 @@ func getContract(cli *ethclient.Client, from *keystore.Key, to common.Address, g
 	}, nil
 }
 
-func hashCount(ctr *metclient.RemoteContract) (count int, err error) {
+func kvCount(ctr *metclient.RemoteContract) (count int, err error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -81,7 +81,7 @@ func hashCount(ctr *metclient.RemoteContract) (count int, err error) {
 	return int(_count.Int64()), nil
 }
 
-func hashPut(ctr *metclient.RemoteContract, key, value []byte, async bool) (hash common.Hash, receipt *types.Receipt, err error) {
+func kvPut(ctr *metclient.RemoteContract, key, value []byte, async bool) (hash common.Hash, err error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -93,16 +93,18 @@ func hashPut(ctr *metclient.RemoteContract, key, value []byte, async bool) (hash
 		return
 	}
 
+	var receipt *types.Receipt
 	receipt, err = metclient.GetReceipt(ctx, ctr.Cli, hash, 500, 60)
 	if err != nil {
-		return
-	} else if receipt.Status != 1 {
-		err = fmt.Errorf("Execution status %d\n", receipt.Status)
+		return hash, err
+	} else if receipt.Status == 1 {
+		return hash, nil
+	} else {
+		return hash, fmt.Errorf("Execution status %d\n", receipt.Status)
 	}
-	return
 }
 
-func hashMput(ctr *metclient.RemoteContract, kvs [][]byte, async bool) (hash common.Hash, err error) {
+func kvMput(ctr *metclient.RemoteContract, kvs [][]byte, async bool) (hash common.Hash, err error) {
 	var bb bytes.Buffer
 	for _, i := range kvs {
 		bb.Write(metclient.PackNum(reflect.ValueOf(len(i))))
@@ -131,7 +133,7 @@ func hashMput(ctr *metclient.RemoteContract, kvs [][]byte, async bool) (hash com
 	}
 }
 
-func hashGet(ctr *metclient.RemoteContract, key []byte) (value []byte, err error) {
+func kvGet(ctr *metclient.RemoteContract, key []byte) (value []byte, err error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -190,9 +192,9 @@ func bulk_func(numThreads int, producer func() func(int) int) {
 func usage() {
 	fmt.Printf(
 		`Usage: cmet [options...] [deploy <contract.(js|.json)>+ |
-    hash-count | hash-put <key> <value> | hash-get <key> <value> |
-    bulk-hash-put <prefix> <start> <end> <batch> |
-    bulk-hash-get <prefix> <start> <end>]
+    kv-count | kv-put <key> <value> | kv-get <key> <value> |
+    bulk-kv-put <prefix> <start> <end> [<batch>] |
+    bulk-kv-get <prefix> <start> <end>]
 
 options:
 -a <password> <account-file>: an ethereum account file and password: CMET_ACCOUNT.
@@ -377,7 +379,7 @@ func main() {
 			}
 		}
 
-	case "hash-count":
+	case "kv-count":
 		if len(nargs) < 1 {
 			usage()
 			return
@@ -397,7 +399,7 @@ func main() {
 		}
 
 		var count int
-		count, err = hashCount(ctr)
+		count, err = kvCount(ctr)
 		if err == nil {
 			fmt.Println(count)
 		} else {
@@ -405,7 +407,7 @@ func main() {
 			os.Exit(1)
 		}
 
-	case "hash-put":
+	case "kv-put":
 		if len(nargs) < 3 {
 			usage()
 			return
@@ -431,21 +433,15 @@ func main() {
 			os.Exit(1)
 		}
 
-		var hash common.Hash
-		var receipt *types.Receipt
-		hash, receipt, err = hashPut(ctr, []byte(nargs[1]), []byte(nargs[2]),
-			false)
+		var tx common.Hash
+		tx, err = kvPut(ctr, []byte(nargs[1]), []byte(nargs[2]), false)
 		if err != nil {
 			fmt.Printf("Failed to put data: %s\n", err)
-		} else if receipt.Status != 1 {
-			fmt.Printf("Failed: hash %s status %d\n", hash.String(),
-				receipt.Status)
 		} else {
-			fmt.Printf("Hash %s status %d\n", hash.String(),
-				receipt.Status)
+			fmt.Printf("Hash %s\n", tx.String())
 		}
 
-	case "hash-get":
+	case "kv-get":
 		if len(nargs) < 2 {
 			usage()
 			return
@@ -465,15 +461,15 @@ func main() {
 		}
 
 		var value []byte
-		value, err = hashGet(ctr, []byte(nargs[1]))
+		value, err = kvGet(ctr, []byte(nargs[1]))
 		if err != nil {
 			fmt.Printf("Failed to get: %s\n", err)
 		} else {
 			fmt.Println(string(value))
 		}
 
-	case "bulk-hash-put":
-		if len(nargs) < 5 {
+	case "bulk-kv-put":
+		if len(nargs) < 4 {
 			usage()
 			return
 		}
@@ -502,10 +498,17 @@ func main() {
 		prefix := nargs[1]
 		start, e1 := strconv.Atoi(nargs[2])
 		end, e2 := strconv.Atoi(nargs[3])
-		per, e3 := strconv.Atoi(nargs[4])
-		if e1 != nil || e2 != nil || e3 != nil {
+		if e1 != nil || e2 != nil {
 			usage()
 			return
+		}
+		per := 1
+		if len(nargs) > 4 {
+			var e3 error
+			if per, e3 = strconv.Atoi(nargs[4]); e3 != nil {
+				usage()
+				return
+			}
 		}
 
 		i := start
@@ -524,20 +527,39 @@ func main() {
 			}
 
 			var data [][]byte
-			for ix := si; ix <= ei; ix++ {
-				x := []byte(fmt.Sprintf("%s-%d", prefix, ix))
-				data = append(data, x)
-				x = []byte(fmt.Sprintf("%s-%d-data", prefix, ix))
-				data = append(data, x)
+			if per != 1 {
+				for ix := si; ix <= ei; ix++ {
+					x := []byte(fmt.Sprintf("%s-%d", prefix, ix))
+					data = append(data, x)
+					x = []byte(fmt.Sprintf("%s-%d-data", prefix, ix))
+					data = append(data, x)
+				}
 			}
 
 			return func(gid int) int {
-				tx, err := hashMput(ctr, data, true)
+				var tx common.Hash
+				var err error
+
+				if per == 1 {
+					k := fmt.Sprintf("%s-%d", prefix, si)
+					v := fmt.Sprintf("%s-%d-data", prefix, si)
+					tx, err = kvPut(ctr, []byte(k), []byte(v), true)
+				} else {
+					tx, err = kvMput(ctr, data, true)
+				}
 				if err != nil {
-					fmt.Printf("%d-%d: %s\n", si, ei, err)
+					if si == ei {
+						fmt.Printf("%d: %s\n", si, err)
+					} else {
+						fmt.Printf("%d-%d: %s\n", si, ei, err)
+					}
 				}
 				if !silent {
-					fmt.Printf("%d-%d: %s\n", si, ei, tx.Hex())
+					if si == ei {
+						fmt.Printf("%d: %s\n", si, tx.Hex())
+					} else {
+						fmt.Printf("%d-%d: %s\n", si, ei, tx.Hex())
+					}
 				}
 				if ei >= end {
 					if !silent {

@@ -1,6 +1,8 @@
+// kv-store.sol
+
 pragma solidity ^0.4.0;
 
-contract HashTable {
+contract KVStore {
     int256 public count;
     mapping (bytes => bytes) data;
 
@@ -66,4 +68,4 @@ contract HashTable {
     }
 }
 
-/* EOF */
+// EOF
