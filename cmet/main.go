@@ -24,6 +24,8 @@ import (
 
 var (
 	nilAddress = common.Address{}
+	DefaultGas = int(1000000)
+	DefaultUrl = "http://localhost:8588"
 )
 
 // load the first contract in the given file
@@ -198,11 +200,11 @@ func usage() {
     bulk-kv-get <prefix> <start> <end>]
 
 options:
--a <password> <account-file>: an ethereum account file and password: CMET_ACCOUNT.
+-a <password> <account-file>: an ethereum account file and password (CMET_ACCOUNT)
 	-:	read from stdin
 	@<file-name>:	password is in <file-name> file
 -c <contract-address>:	if not specified, env. var. CMET_CONTRACT.
--g <gas>:	gas amount
+-g <gas>:	gas amount (CMET_GAS)
 -p <gas-price>: gas price
 -i <abi>:	ABI in .json or .js file, if not specified, env. var. CMET_ABI.
 -s <url>:	gmet url. CMET_URL.
@@ -317,10 +319,24 @@ func main() {
 		if v := os.Getenv("CMET_URL"); len(v) > 0 {
 			reqUrl = v
 		}
+		if len(reqUrl) == 0 {
+			reqUrl = DefaultUrl
+		}
 	}
 	if contractAddress == nilAddress {
 		if v := os.Getenv("CMET_CONTRACT"); len(v) > 0 && common.IsHexAddress(v) {
 			contractAddress = common.HexToAddress(v)
+		}
+	}
+	if gas == 0 {
+		if v := os.Getenv("CMET_GAS"); len(v) > 0 {
+			if gas, err = strconv.Atoi(v); err != nil {
+				fmt.Printf("Invalid gas value: %s\n", v)
+				return
+			}
+		}
+		if gas == 0 {
+			gas = DefaultGas
 		}
 	}
 
@@ -426,8 +442,8 @@ func main() {
 		receipt, err = metclient.GetReceipt(ctx, cli, tx, 500, 10000)
 		if err != nil {
 			fmt.Printf("Failed to send to %s: %s\n", to.String(), err)
-		} else if receipt.Status == 1 {
-			fmt.Printf("Failed to send to %s: status = %d%s\n",
+		} else if receipt.Status != 1 {
+			fmt.Printf("Failed to send to %s: status = %d\n",
 				nargs[1], receipt.Status)
 		} else {
 			fmt.Printf("Hash %s\n", tx.String())

@@ -1,19 +1,21 @@
 // kv-store.sol
 
-pragma solidity ^0.4.0;
+pragma solidity ^0.4.24;
 
 contract KVStore {
+    bytes32 public magic = 0x4b5653746f7265;	// "KVStore"
     int256 public count;
-    mapping (bytes => bytes) data;
+    mapping (bytes32 => bytes) data;
 
     event Log(string which, bytes key, bytes value);
 
     function put(bytes key, bytes value, bool log) public returns (int inc) {
-        if (data[key].length == 0) {
+        bytes32 kh = keccak256(key);
+        if (data[kh].length == 0) {
             inc = 1;
             count++;
         }
-        data[key] = value;
+        data[kh] = value;
         if (log) {
             emit Log("put", key, value);
         }
@@ -45,10 +47,11 @@ contract KVStore {
             ix += 0x20 + v.length;
             require(ix <= eix);
 
-            if (data[k].length == 0) {
+            bytes32 kh = keccak256(k);
+            if (data[kh].length == 0) {
                 cnt++;
             }
-            data[k] = v;
+            data[kh] = v;
         }
         count += cnt;
         if (log) {
@@ -57,14 +60,15 @@ contract KVStore {
     }
 
     function del(bytes key) public {
-        if (data[key].length != 0) {
+        bytes32 kh = keccak256(key);
+        if (data[kh].length != 0) {
             count--;
-            delete data[key];
+            delete data[kh];
         }
     }
 
     function get(bytes key) public view returns (bytes value) {
-        value = data[key];
+        value = data[keccak256(key)];
     }
 }
 
