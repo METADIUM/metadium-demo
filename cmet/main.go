@@ -94,7 +94,7 @@ func kvPut(ctr *metclient.RemoteContract, key, value []byte, async bool) (hash c
 	}
 
 	var receipt *types.Receipt
-	receipt, err = metclient.GetReceipt(ctx, ctr.Cli, hash, 500, 60)
+	receipt, err = metclient.GetReceipt(ctx, ctr.Cli, hash, 500, 10000)
 	if err != nil {
 		return hash, err
 	} else if receipt.Status == 1 {
@@ -123,7 +123,7 @@ func kvMput(ctr *metclient.RemoteContract, kvs [][]byte, async bool) (hash commo
 	}
 
 	var receipt *types.Receipt
-	receipt, err = metclient.GetReceipt(ctx, ctr.Cli, hash, 500, 60)
+	receipt, err = metclient.GetReceipt(ctx, ctr.Cli, hash, 500, 10000)
 	if err != nil {
 		return hash, err
 	} else if receipt.Status == 1 {
@@ -192,6 +192,7 @@ func bulk_func(numThreads int, producer func() func(int) int) {
 func usage() {
 	fmt.Printf(
 		`Usage: cmet [options...] [deploy <contract.(js|.json)>+ |
+    send <to> <amount> |
     kv-count | kv-put <key> <value> | kv-get <key> <value> |
     bulk-kv-put <prefix> <start> <end> [<batch>] |
     bulk-kv-get <prefix> <start> <end>]
@@ -364,7 +365,7 @@ func main() {
 				continue
 			}
 
-			receipt, err = metclient.GetContractReceipt(ctx, cli, hash, 500, 60)
+			receipt, err = metclient.GetContractReceipt(ctx, cli, hash, 500, 10000)
 			cancel()
 			if err != nil {
 				fmt.Printf("Contract failed: %s\n", err)
@@ -377,6 +378,59 @@ func main() {
 				fmt.Printf("address: %s transactionHash: %s\n",
 					receipt.ContractAddress.String(), hash.String())
 			}
+		}
+
+	case "send":
+		if len(nargs) != 3 {
+			usage()
+			return
+		}
+
+		if !common.IsHexAddress(nargs[1]) {
+			fmt.Println("Invalid address", err)
+			os.Exit(1)
+		}
+		to := common.HexToAddress(nargs[1])
+
+		amount, err := strconv.Atoi(nargs[2])
+		if err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+		}
+
+		account, err = metclient.LoadAccount(accountPassword, accountFile)
+		if err != nil {
+			usage()
+			fmt.Println("Failed to load account:", err)
+			os.Exit(1)
+		}
+
+		var cli *ethclient.Client
+		cli, err = ethclient.Dial(reqUrl)
+		if err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+		}
+
+		var tx common.Hash
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		tx, err = metclient.SendValue(ctx, cli, account, to, amount,
+			gas, gasPrice)
+		if err != nil {
+			fmt.Printf("Sending to %s failed: %s\n", nargs[1], err)
+			os.Exit(1)
+		}
+
+		var receipt *types.Receipt
+		receipt, err = metclient.GetReceipt(ctx, cli, tx, 500, 10000)
+		if err != nil {
+			fmt.Printf("Failed to send to %s: %s\n", to.String(), err)
+		} else if receipt.Status == 1 {
+			fmt.Printf("Failed to send to %s: status = %d%s\n",
+				nargs[1], receipt.Status)
+		} else {
+			fmt.Printf("Hash %s\n", tx.String())
 		}
 
 	case "kv-count":
